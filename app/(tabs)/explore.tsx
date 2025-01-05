@@ -1,109 +1,172 @@
-import { StyleSheet, Image, Platform } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  Text,
+  Dimensions,
+} from 'react-native';
+import MapView, { Polyline, Region } from 'react-native-maps';
+import * as Location from 'expo-location';
+import Svg, { Rect } from 'react-native-svg';
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+const MAP_ZOOM = 0.01;
+const INITIAL_REGION = {
+  latitudeDelta: MAP_ZOOM,
+  longitudeDelta: MAP_ZOOM,
+  latitude: 0,
+  longitude: 0,
+};
 
-export default function TabTwoScreen() {
+const deltaToZoomLevel = (delta: number) => {
+  return Math.round(-Math.log2(delta) + 9);
+};
+
+export default function ExploreScreen() {
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [mapRegion, setMapRegion] = useState<Region>(INITIAL_REGION);
+  const [isRegionSet, setIsRegionSet] = useState(false);
+  const mapRef = useRef<MapView | null>(null);
+  const [pathCoordinates, setPathCoordinates] = useState<
+    Array<{ latitude: number; longitude: number }>
+  >([]);
+
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.error('Permission to access location was denied');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setLocation(location);
+
+      if (!isRegionSet) {
+        const newRegion = {
+          latitudeDelta: MAP_ZOOM,
+          longitudeDelta: MAP_ZOOM,
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        };
+        setMapRegion(newRegion);
+        setIsRegionSet(true);
+      }
+
+      Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, distanceInterval: 10 },
+        (location) => {
+          setLocation(location);
+          setPathCoordinates((prevCoordinates) => [
+            ...prevCoordinates,
+            {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            },
+          ]);
+        }
+      );
+    })();
+  }, [isRegionSet]);
+
+  const savePath = () => {
+    console.log('Save button pressed');
+  };
+
+  const { width, height } = Dimensions.get('window');
+  const cellSize = 20; // Size of each grid cell in pixels
+  const cols = Math.ceil(width / cellSize);
+  const rows = Math.ceil(height / cellSize);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user's current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      <View style={styles.mapContainer}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          region={mapRegion}
+          showsUserLocation={true}
+          minZoomLevel={deltaToZoomLevel(MAP_ZOOM) - 2}
+          maxZoomLevel={deltaToZoomLevel(MAP_ZOOM) + 2}
+          rotateEnabled={false}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          pointerEvents="none"
+        >
+          <Polyline coordinates={pathCoordinates} strokeColor="#FF4500" strokeWidth={3} />
+        </MapView>
+
+        {/* Minecraft-style Grid Overlay */}
+        <Svg
+          style={StyleSheet.absoluteFill}
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+        >
+          {Array.from({ length: cols * rows }).map((_, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            return (
+              <Rect
+                key={i}
+                x={col * cellSize}
+                y={row * cellSize}
+                width={cellSize}
+                height={cellSize}
+                fill={row % 2 === col % 2 ? '#7CFC00' : '#32CD32'}
+                stroke="#000"
+                strokeWidth={1}
+                opacity={0.7}
+              />
+            );
+          })}
+        </Svg>
+      </View>
+
+      <TouchableOpacity style={styles.saveButton} onPress={savePath}>
+        <Text style={styles.saveButtonText}>Save Map</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  mapContainer: {
+    position: 'absolute',
+    width: '100%',
+    aspectRatio: 1.1,
+    borderWidth: 20,
+    borderColor: '#8B4513',
+    borderRadius: 20,
+    overflow: 'hidden',
+    top: '20%',
+    left: '0%',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  saveButton: {
+    position: 'absolute',
+    marginTop: 600,
+    marginHorizontal: '10%',
+    width: '80%',
+    height: 50,
+    backgroundColor: '#8B4513',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
